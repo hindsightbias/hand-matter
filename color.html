@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Color Sorting Challenge</title>
+    <script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="hand-tracker.js"></script>
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #0f172a;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        nav {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 3;
+        }
+
+        nav a {
+            margin-right: 15px;
+            color: white;
+            font-family: sans-serif;
+            text-decoration: none;
+            font-size: 18px;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+        }
+
+        nav a:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        #timer {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 700px;
+            color: white;
+            opacity: 0.1;
+            pointer-events: none;
+            font-family: sans-serif;
+        }
+
+        #score {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 2;
+            position: absolute;
+            font-family: sans-serif;
+            font-size: 24px;
+            color: white;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+        }
+    </style>
+</head>
+
+<body>
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="math.html">Math</a>
+        <a href="color.html">Color</a>
+        <a href="music.html">Music</a>
+    </nav>
+    <div id="timer">60</div>
+    <canvas id="confettiCanvas" style="position:absolute; top:0; left:0; pointer-events:none;"></canvas>
+    <div id="score">Score: 0</div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const colors = ['orange', 'green', 'pink'];
+        let targetColor = '';
+        let score = 0;
+        let timeLeft = 60;
+
+        initHandTracking("canvas", (engine, world, { Bodies, World, Events }) => {
+            // initHandTracking("canvas", (world, { Bodies, World, spawnRandom }) => {
+            const canvasEl = document.getElementById("canvas");
+
+            // create three buckets
+            const bucketWidth = 200;
+            const bucketHeight = 30;
+            const bucketY = 300;
+
+            const buckets = [];
+
+            // positions: left, center, right
+            const positions = [
+                canvasEl.width / 4,
+                canvasEl.width / 2,
+                (canvasEl.width * 3) / 4
+            ];
+
+            positions.forEach((x, i) => {
+                const bucket = Bodies.rectangle(x, bucketY, bucketWidth, bucketHeight, {
+                    isStatic: true,
+                    label: 'bucket' + colors[i], // unique label
+                    render: { fillStyle: colors[i] }, // optional colors
+                    colorLabel: colors[i]
+                });
+                World.add(world, bucket);
+                buckets.push(bucket);
+            });
+
+            // spawn colored blocks
+            let blocks = [];
+            function spawnBlocks() {
+                blocks.forEach(b => World.remove(world, b));
+                blocks = [];
+                for (let i = 0; i < 6; i++) {
+                    const color = colors[Math.floor(Math.random() * colors.length)];
+                    const scale = 3; // scale between 0.7 and 2.0
+                    const radius = 30 * scale;
+                    const b = Bodies.circle(
+                        100 + Math.random() * (canvasEl.width - 200),
+                        400 + Math.random() * 200,
+                        radius,
+                        {
+                            render: { fillStyle: color }
+                        }
+                    )
+                    b.colorLabel = color;
+                    blocks.push(b);
+                }
+                World.add(world, blocks);
+            }
+            spawnBlocks();
+
+            // timer countdown with background color and large time display
+            const timerEl = document.getElementById('timer');
+
+            const startTime = timeLeft;
+            const interval = setInterval(() => {
+                timeLeft--;
+
+                // display large time
+                timerEl.innerText = timeLeft;
+
+                // gradually change background color from dark blue (#0f172a) to red (#ff0000)
+                const t = Math.max(timeLeft / startTime, 0);
+                const r = Math.floor(255 * (1 - t));
+                const g = Math.floor(23 * t);
+                const b = Math.floor(42 * t);
+                document.body.style.background = `rgb(${r},${g},${b})`;
+
+                if (timeLeft <= 0) {
+                    clearInterval(interval);
+                    alert("Time's up! Final score: " + score);
+                    location.reload();
+                }
+            }, 1000);
+
+
+
+            Events.on(engine, 'collisionStart', event => {
+                event.pairs.forEach(pair => {
+                    let block = null;
+                    if (!pair.bodyA.label.startsWith('bucket') && pair.bodyB.label.startsWith('bucket')) block = pair.bodyA, bucket = pair.bodyB;
+                    else if (!pair.bodyB.label.startsWith('bucket') && pair.bodyA.label.startsWith('bucket')) block = pair.bodyB, bucket = pair.bodyA;
+                    if (block) {
+                        console.log('Block', block.colorLabel, 'in bucket', bucket.colorLabel);
+                        if (block.colorLabel === bucket.colorLabel) {
+                            score++;
+                            document.getElementById('score').innerText = "Score: " + score;
+                            spawnConfetti(block.position.x, block.position.y, 15); // trigger confetti
+                            World.remove(world, block);
+                            blocks = blocks.filter(b => b !== block);
+                            if (blocks.length === 0) {
+                                spawnBlocks();
+                            }
+                        }
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>

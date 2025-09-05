@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Math Number Drag</title>
+    <script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="hand-tracker.js"></script>
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #0f172a;
+        }
+
+        nav {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+        }
+
+        nav a {
+            margin-right: 15px;
+            color: white;
+            font-family: sans-serif;
+            text-decoration: none;
+            font-size: 18px;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+        }
+
+        nav a:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="math.html">Math</a>
+        <a href="color.html">Color</a>
+        <a href="music.html">Music</a>
+    </nav>
+    <canvas id="gridCanvas" style="position:absolute; top:0; left:0; z-index:0;"></canvas>
+    <canvas id="canvas"></canvas>
+    <script>
+        // global scale for blocks and grid
+        let scale = 3; // initial scale
+
+
+        // --------- horizontal grid lines canvas ------------
+        const gridCanvas = document.getElementById('gridCanvas');
+        gridCanvas.width = window.innerWidth;
+        gridCanvas.height = window.innerHeight;
+        const ctx = gridCanvas.getContext('2d');
+
+        // Draw horizontal lines
+        const blockSize = 10 * scale; // can be dynamic
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 1;
+        let number = 0;
+        for (let y = gridCanvas.height; y > 0; y -= blockSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(gridCanvas.width, y);
+            ctx.font = "bold 18px Arial"; // set font size and family
+            ctx.fillStyle = "#facc15";    // set text color
+
+            // Left
+            ctx.fillText(number, 20, y - 5);
+
+            // Middle
+            ctx.fillText(number, gridCanvas.width / 2 - ctx.measureText(number).width / 2, y - 5);
+
+            // Right
+            ctx.fillText(number, gridCanvas.width - 40, y - 5);
+
+            ctx.stroke();
+            number++;
+        }
+
+        // Make it responsive
+        window.addEventListener('resize', () => {
+            gridCanvas.width = window.innerWidth;
+            gridCanvas.height = window.innerHeight;
+            ctx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+            for (let y = gridCanvas.height - blockSize; y > 0; y -= blockSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(gridCanvas.width, y);
+                ctx.stroke();
+            }
+        });
+        // ---------- end horizontal grid lines canvas --------
+
+        let blocks = [];
+
+        function spawnBlocks(world, Bodies, World) {
+            blocks.forEach(b => World.remove(world, b));
+            blocks = [];
+            const canvasEl = document.getElementById("canvas");
+            const positionsX = [];
+            const startX = 100;
+            const spacing = 10 * scale; // 30px * scale between blocks
+            let currentX = startX;
+            for (let i = 1; i <= 9; i++) {
+                positionsX.push(currentX);
+                const size = i * 10 * scale;
+                currentX += size + spacing;
+            }
+
+            for (let i = 1; i <= 9; i++) {
+                const size = i * 10 * scale; // 1 -> 10px, 5 -> 50px
+                const block = Bodies.rectangle(
+                    positionsX[i - 1],
+                    400 + Math.random() * 200,
+                    size,
+                    size,
+                    {
+                        render: { fillStyle: '#facc15', strokeStyle: '#000', lineWidth: 2 }
+                    }
+                );
+                block.number = i;
+                blocks.push(block);
+            }
+            World.add(world, blocks);
+        }
+
+
+        initHandTracking("canvas", (engine, world, { Bodies, World, Events, Render }) => {
+            const canvasEl = document.getElementById("canvas");
+            spawnBlocks(world, Bodies, World);
+        });
+    </script>
+</body>
+
+</html>

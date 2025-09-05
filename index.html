@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Hand Tracker Playground</title>
+    <script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="hand-tracker.js"></script>
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #0f172a;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        nav {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+        }
+
+        nav a {
+            margin-right: 15px;
+            color: white;
+            font-family: sans-serif;
+            text-decoration: none;
+            font-size: 18px;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+        }
+
+        nav a:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .logo-container {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            z-index: 1000;
+        }
+
+        .logo-container img {
+            width: 500px;
+            /* adjust this number */
+            height: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="math.html">Math</a>
+        <a href="color.html">Color</a>
+        <a href="music.html">Music</a>
+    </nav>
+
+    <div class="logo-container">
+        <img src="wiggle-fingers_2.png" alt="Wiggle Fingers Logo">
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        initHandTracking("canvas");
+    </script>
+</body>
+
+</html>

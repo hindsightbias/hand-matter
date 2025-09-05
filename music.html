@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Musical Keys</title>
+    <script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="hand-tracker.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.min.js"></script>
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #0f172a;
+        }
+
+        nav {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+        }
+
+        nav a {
+            margin-right: 15px;
+            color: white;
+            font-family: sans-serif;
+            text-decoration: none;
+            font-size: 18px;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+        }
+
+        nav a:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="math.html">Math</a>
+        <a href="color.html">Color</a>
+        <a href="music.html">Music</a>
+    </nav>
+    <canvas id="canvas"></canvas>
+    <script>
+        const keyColors = ["#FF4C4C", "#FF8C4C", "#FFD24C", "#4CFF4C", "#4CFFD2", "#4C8CFF", "#B84CFF", "#FF4CFF",]; // Red, Orange, Yellow, Green, Cyan, Blue, Purple, Magenta
+        const canvasEl = document.getElementById("canvas");
+        const ctx = canvasEl.getContext("2d");
+        canvasEl.width = window.innerWidth;
+        canvasEl.height = window.innerHeight;
+        const keyWidth = canvasEl.width / keyColors.length;
+        const keyHeight = canvasEl.height / 3;
+        const keys = keyColors.map((color, i) => ({
+            x: i * keyWidth,
+            y: canvasEl.height - keyHeight,
+            width: keyWidth,
+            height: keyHeight,
+            color,
+        }));
+
+        const keyNotes = [60, 62, 64, 65, 67, 69, 71, 72]; // C4 to C5
+        initHandTracking("canvas", (engine, world, { Bodies, World, Events }) => {
+            const synth = new Tone.Synth().toDestination();
+            Events.on(engine, 'collisionStart', event => {
+                event.pairs.forEach(pair => {
+                    const labels = [pair.bodyA.label, pair.bodyB.label];
+                    keys.forEach((key, i) => {
+                        if (labels.includes('hand') && labels.includes('key' + i)) {
+                            synth.triggerAttackRelease(Tone.Frequency(keyNotes[i], "midi"), "8n");
+                        }
+                    });
+                });
+            });
+            // create key bodies for collision detection
+            keys.forEach((key, i) => {
+                const keyBody = Bodies.rectangle(
+                    key.x + key.width / 2,
+                    key.y + key.height / 2,
+                    key.width,
+                    key.height,
+                    { isStatic: true, label: 'key' + i }
+                );
+                World.add(world, keyBody);
+            });
+        });
+    </script>
+</body>
+
+</html>
