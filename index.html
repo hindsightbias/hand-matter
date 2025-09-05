@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hand Matter Demo</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #0f172a;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #e6eef8;
+            font-family: sans-serif;
+            max-width: 300px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="info">
+        Pinch (thumb+index) to grab shapes.<br>
+        Move hand to push and fling objects.<br>
+    </div>
+    <video id="video" style="display:none;" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const video = document.getElementById('video');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const { Engine, Render, Runner, World, Bodies, Body, Constraint, Composite, Events } = Matter;
+
+        const engine = Engine.create();
+        const world = engine.world;
+
+        const render = Render.create({
+            canvas: canvas,
+            engine: engine,
+            options: { width: canvas.width, height: canvas.height, wireframes: false, background: '#0f172a' }
+        });
+        Render.run(render);
+        const runner = Runner.create();
+        Runner.run(runner, engine);
+
+        // walls
+        const thickness = 100;
+        World.add(world, [
+            Bodies.rectangle(canvas.width / 2, -thickness / 2, canvas.width, thickness, { isStatic: true }),
+            Bodies.rectangle(canvas.width / 2, canvas.height + thickness / 2, canvas.width, thickness, { isStatic: true }),
+            Bodies.rectangle(-thickness / 2, canvas.height / 2, thickness, canvas.height, { isStatic: true }),
+            Bodies.rectangle(canvas.width + thickness / 2, canvas.height / 2, thickness, canvas.height, { isStatic: true }),
+        ]);
+
+        // random shapes
+        function spawnRandom(count = 20, scale = 1) {
+            const shapes = [];
+            for (let i = 0; i < count; i++) {
+                const x = 60 + Math.random() * (canvas.width - 120);
+                const y = 60 + Math.random() * (canvas.height - 120);
+                if (Math.random() < 0.5) {
+                    const r = (12 + Math.random() * 30) * scale;
+                    shapes.push(Bodies.circle(x, y, r, { restitution: 0.6, friction: 0.1 }));
+                } else {
+                    const w = (30 + Math.random() * 60) * scale;
+                    const h = (20 + Math.random() * 50) * scale;
+                    shapes.push(Bodies.rectangle(x, y, w, h, { restitution: 0.4, friction: 0.2 }));
+                }
+            }
+            World.add(world, shapes);
+        }
+        spawnRandom(26, 2);
+
+        // hand body
+        const handBody = Bodies.circle(canvas.width / 2, canvas.height / 2, 16, {
+            isSensor: true, inertia: Infinity, collisionFilter: { group: -1 }, render: { fillStyle: 'rgba(99,102,241,0.9)' }
+        });
+        Body.setMass(handBody, 5);
+        World.add(world, handBody);
+
+        const handState = { grabbing: false, constraint: null };
+
+        Events.on(engine, 'beforeUpdate', () => {
+            Body.setVelocity(handBody, { x: handBody.velocity.x * 0.2, y: handBody.velocity.y * 0.2 });
+        });
+
+        // Mediapipe
+        const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.6 });
+
+        hands.onResults(results => {
+            if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) return;
+            const lm = results.multiHandLandmarks[0];
+            const ix = (1 - lm[8].x) * canvas.width; // flip horizontally
+            const iy = lm[8].y * canvas.height;
+            Body.setPosition(handBody, { x: ix, y: iy });
+
+            const tx = (1 - lm[4].x) * canvas.width; // flip horizontally
+            const ty = lm[4].y * canvas.height;
+            const dist = Math.hypot(tx - ix, ty - iy);
+            var grabbing = dist < 40;
+            if (handState.grabbing) {
+                grabbing = true;
+            }
+
+            if (grabbing && !handState.grabbing) {
+                // handBody.isStatic = true; // stop hand from shaking
+                const bodies = Composite.allBodies(world);
+                let target = null, minD = 9999;
+                // Finds the closest object among all grabbable objects within 80px.
+                for (const b of bodies) {
+                    if (b === handBody || b.isStatic) continue;
+                    const dd = Math.hypot(b.position.x - ix, b.position.y - iy);
+                    if (dd < 80 && dd < minD) { minD = dd; target = b; }
+                }
+                if (target) {
+                    // Creates a Matter.js constraint (like a spring or rigid rod) between your hand and the target
+                    const c = Constraint.create({ bodyA: handBody, bodyB: target, pointA: { x: 0, y: 0 }, pointB: { x: 0, y: 0 }, stiffness: 0.8, damping: 0.4 });
+                    World.add(world, c);
+                    handState.constraint = c;
+                    handState.grabbing = true;
+                } else { handState.grabbing = true; }
+            }
+
+            if (!grabbing && handState.grabbing) {
+                if (handState.constraint) World.remove(world, handState.constraint);
+                handState.constraint = null;
+                handState.grabbing = false;
+            }
+        });
+
+        // camera
+        const camera = new Camera(video, { onFrame: async () => { await hands.send({ image: video }) }, width: 1280, height: 720 });
+        camera.start();
+
+        // draw hand tip indicator
+        Events.on(render, 'afterRender', () => {
+            const ctx = render.context;
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(handBody.position.x, handBody.position.y, 12, 0, Math.PI * 2);
+            ctx.fillStyle = handState.grabbing ? 'rgba(236,72,153,0.9)' : 'rgba(99,102,241,0.9)';
+            ctx.fill();
+            ctx.restore();
+        });
+
+        // resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+
+</html>
