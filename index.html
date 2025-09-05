@@ -114,9 +114,6 @@
             const ty = lm[4].y * canvas.height;
             const dist = Math.hypot(tx - ix, ty - iy);
             var grabbing = dist < 40;
-            if (handState.grabbing) {
-                grabbing = true;
-            }
 
             if (grabbing && !handState.grabbing) {
                 // handBody.isStatic = true; // stop hand from shaking
